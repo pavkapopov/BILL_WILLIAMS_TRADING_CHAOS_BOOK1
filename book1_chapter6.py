@@ -29,8 +29,8 @@ previous_mfi = 0
 trade_time = 0
 kline_start_time_tick = 0
 kline_close_time_tick = 0
-bay_long = 1
-bay_short = 1
+buy_long = 1
+buy_short = 1
 
 #{
 #  "e": "trade",     // Event type
@@ -73,8 +73,8 @@ def on_message(ws, message):
     global trade_time_tick
     global kline_start_time_tick
     global kline_close_time_tick
-    global bay_long
-    global bay_short
+    global buy_long
+    global buy_short
 
     trade = json.loads(message)
 
@@ -151,18 +151,18 @@ def on_message(ws, message):
             previous_tick_volume = current_tick_volume
             current_tick_volume = 0
             previous_mfi = current_mfi
-            bay_long = 1
-            bay_short = 1
+            buy_long = 1
+            buy_short = 1
 
-    if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi) == "+" and bay_long == 1:
+    if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi) == "+" and buy_long == 1:
         trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
         print(trade_time,last_price,"LONG")
-        bay_long = 0
+        buy_long = 0
 
-    if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi) == "+" and bay_short == 1:
+    if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi) == "+" and buy_short == 1:
         trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
         print(trade_time,last_price,"SHORT")
-        bay_short = 0
+        buy_short = 0
 
 def on_error(ws, error):
     print("### error ###")
