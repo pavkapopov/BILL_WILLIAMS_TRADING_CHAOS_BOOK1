@@ -5,7 +5,7 @@ import datetime
 import sqlite3
 
 tick_volume = "="
-current_tick_volume = 0
+current_tick_volume = 1
 previous_tick_volume = 0
 symbol_price = 0
 last_price = 0
@@ -32,6 +32,7 @@ kline_close_time_tick = 0
 buy_long = 1
 buy_short = 1
 
+symbol = ""
 #{
 #  "e": "trade",     // Event type
 #  "E": 123456789,   // Event time
@@ -75,8 +76,11 @@ def on_message(ws, message):
     global kline_close_time_tick
     global buy_long
     global buy_short
+    global symbol
 
     trade = json.loads(message)
+
+    symbol = trade['s']
 
     if trade['e'] == "trade":
         last_price = float(trade['p'])
@@ -93,7 +97,7 @@ def on_message(ws, message):
         kline_start_time_tick = float(trade['k']['t'])
         kline_close_time_tick = float(trade['k']['T'])
         #number_of_trades = trade['k']['n']
-        base_asset_volume = float(trade['k']['v'])
+        #base_asset_volume = float(trade['k']['v'])
         is_this_kline_closed = trade['k']['x']
 
 #"грязно" определяем направление тренда
@@ -124,7 +128,7 @@ def on_message(ws, message):
             close_in_interval = 3
 
 #Тиковый объём
-        if current_tick_volume > previous_tick_volume:
+        if current_tick_volume + (previous_tick_volume*0.1) > previous_tick_volume:
             tick_volume = "+"
         if current_tick_volume == previous_tick_volume:
             tick_volume = "="
@@ -132,7 +136,7 @@ def on_message(ws, message):
             tick_volume = "-"
 
 #mfi
-        current_mfi = (high_price - low_price)/base_asset_volume
+        current_mfi = (high_price - low_price)/current_tick_volume
 
         if current_mfi > previous_mfi:
             mfi = "+"
@@ -140,17 +144,19 @@ def on_message(ws, message):
             mfi = "="
         if previous_mfi > current_mfi:
             mfi = "-"
+        
+        previous_mfi = current_mfi
 
         #print(kline_start_time,kline_close_time,open_price,close_price,high_price,low_price,base_asset_volume,is_this_kline_closed,tick_volume)
         if is_this_kline_closed:
             kline_start_time = datetime.datetime.utcfromtimestamp(kline_start_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
             kline_close_time = datetime.datetime.utcfromtimestamp(kline_close_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-            print(kline_start_time,kline_close_time,quick_dirty_trend,open_in_interval,close_in_interval,tick_volume,mfi,open_price,close_price)
+            print(symbol,kline_start_time,kline_close_time,quick_dirty_trend,open_in_interval,close_in_interval,tick_volume,mfi,open_price,close_price,current_tick_volume)
             previous_high_price = high_price
             previous_low_price = low_price
             previous_tick_volume = current_tick_volume
-            current_tick_volume = 0
-            previous_mfi = current_mfi
+            current_tick_volume = 1
+            #previous_mfi = current_mfi
             buy_long = 1
             buy_short = 1
 
