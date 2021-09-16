@@ -31,8 +31,12 @@ kline_start_time_tick = 0
 kline_close_time_tick = 0
 buy_long = 1
 buy_short = 1
+trade_time_tick = 0
 
 symbol = ""
+
+squat_bar_long = 0
+squat_bar_short = 0
 #{
 #  "e": "trade",     // Event type
 #  "E": 123456789,   // Event time
@@ -77,6 +81,8 @@ def on_message(ws, message):
     global buy_long
     global buy_short
     global symbol
+    global squat_bar_long
+    global squat_bar_short
 
     trade = json.loads(message)
 
@@ -144,31 +150,37 @@ def on_message(ws, message):
             mfi = "="
         if previous_mfi > current_mfi:
             mfi = "-"
-        
-        previous_mfi = current_mfi
 
         #print(kline_start_time,kline_close_time,open_price,close_price,high_price,low_price,base_asset_volume,is_this_kline_closed,tick_volume)
         if is_this_kline_closed:
+            squat_bar_long = squat_bar_long - 1
+            squat_bar_short = squat_bar_short - 1
+            if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi) == "-":
+                squat_bar_long = 5
+            if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi) == "-":
+                squat_bar_short = 5
             kline_start_time = datetime.datetime.utcfromtimestamp(kline_start_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
             kline_close_time = datetime.datetime.utcfromtimestamp(kline_close_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-            print(symbol,kline_start_time,kline_close_time,quick_dirty_trend,open_in_interval,close_in_interval,tick_volume,mfi,open_price,close_price,current_tick_volume)
+            print(symbol,kline_start_time,kline_close_time,quick_dirty_trend,open_in_interval,close_in_interval,tick_volume,mfi,high_price,low_price,open_price,close_price,current_tick_volume)
             previous_high_price = high_price
             previous_low_price = low_price
             previous_tick_volume = current_tick_volume
             current_tick_volume = 1
-            #previous_mfi = current_mfi
+            previous_mfi = current_mfi
             buy_long = 1
             buy_short = 1
 
-    if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi) == "+" and buy_long == 1:
+    if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi)  == "+" and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
         trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        print(trade_time,last_price,"LONG")
+        print(trade_time,last_price,"LONG",high_price)
         buy_long = 0
+        squat_bar_long = 0
 
-    if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi) == "+" and buy_short == 1:
+    if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi)  == "+" and buy_short == 1 and squat_bar_short > 0 and squat_bar_short <= 5:
         trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        print(trade_time,last_price,"SHORT")
+        print(trade_time,last_price,"SHORT",low_price)
         buy_short = 0
+        squat_bar_short = 0
 
 def on_error(ws, error):
     print("### error ###")
@@ -186,7 +198,7 @@ def on_open(ws):
 
 #if __name__ == "__main__":
 def binance_socket():
-    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/adausdt@kline_15m/adausdt@trade",
+    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/adausdt@kline_30m/adausdt@trade",
                                 on_message = on_message,
                                 on_error = on_error,
                                 on_close = on_close)
