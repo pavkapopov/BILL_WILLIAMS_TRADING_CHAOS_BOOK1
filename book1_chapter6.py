@@ -3,6 +3,9 @@ import json
 import time
 import datetime
 import sqlite3
+import requests
+import talib
+import numpy as np
 
 tick_volume = "="
 current_tick_volume = 1
@@ -37,6 +40,9 @@ symbol = ""
 
 squat_bar_long = 0
 squat_bar_short = 0
+
+sma2 = [0,0]
+sma5 = [0,0]
 #{
 #  "e": "trade",     // Event type
 #  "E": 123456789,   // Event time
@@ -83,9 +89,10 @@ def on_message(ws, message):
     global symbol
     global squat_bar_long
     global squat_bar_short
+    global sma2
+    global sma5
 
     trade = json.loads(message)
-
     symbol = trade['s']
 
     if trade['e'] == "trade":
@@ -153,11 +160,18 @@ def on_message(ws, message):
 
         #print(kline_start_time,kline_close_time,open_price,close_price,high_price,low_price,base_asset_volume,is_this_kline_closed,tick_volume)
         if is_this_kline_closed:
+            clist = requests.get("https://api.binance.com/api/v3/klines?symbol=ADAUSDT&interval=5m&limit=5").json()
+            close = []
+            for i in range(len(clist)):
+                close.append(float(clist[i][4]))
+            sma2 = talib.SMA(np.array(close),2)
+            sma5 = talib.SMA(np.array(close),5)
+
             squat_bar_long = squat_bar_long - 1
             squat_bar_short = squat_bar_short - 1
             if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi) == "-":
-                trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-                print(trade_time,last_price,"LONG",high_price)
+                #trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+                #print(trade_time,last_price,"LONG",high_price)
                 squat_bar_long = 5
             if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi) == "-":
                 #trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
@@ -174,17 +188,15 @@ def on_message(ws, message):
             buy_long = 1
             buy_short = 1
 
-    if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi)  == "+" and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
-        #trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        #print(trade_time,last_price,"LONG_STOP",high_price)
+    if sma2[-1] > sma5[-1] and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
+        trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+        print(trade_time,last_price,"LONG",high_price)
         buy_long = 0
         squat_bar_long = 0
 
-    if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi)  == "+" and buy_short == 1 and squat_bar_short > 0 and squat_bar_short <= 5:
-        #trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        #print(trade_time,last_price,"SHORT_STOP",low_price)
-        buy_short = 0
-        squat_bar_short = 0
+    if sma5[-1] > sma2[-1] and buy_long == 0:
+        trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+        print(trade_time,last_price,"LONG_STOP",low_price)
 
 def on_error(ws, error):
     print("### error ###")
