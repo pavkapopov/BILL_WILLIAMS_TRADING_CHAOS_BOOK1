@@ -134,7 +134,7 @@ def on_message(ws, message):
             close_in_interval = 3
 
 #Тиковый объём
-        if current_tick_volume > previous_tick_volume:
+        if current_tick_volume + (previous_tick_volume*0.1) > previous_tick_volume:
             tick_volume = "+"
         if current_tick_volume == previous_tick_volume:
             tick_volume = "="
@@ -160,8 +160,8 @@ def on_message(ws, message):
                 print(trade_time,last_price,"LONG",high_price)
                 squat_bar_long = 5
             if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi) == "-":
-                trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-                print(trade_time,last_price,"SHORT",low_price)
+                #trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+                #print(trade_time,last_price,"SHORT",low_price)
                 squat_bar_short = 5
             kline_start_time = datetime.datetime.utcfromtimestamp(kline_start_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
             kline_close_time = datetime.datetime.utcfromtimestamp(kline_close_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
@@ -175,14 +175,14 @@ def on_message(ws, message):
             buy_short = 1
 
     if str(quick_dirty_trend) == "+" and int(open_in_interval) == 3 and int(close_in_interval) == 1 and str(tick_volume) == "+" and str(mfi)  == "+" and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
-        trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        print(trade_time,last_price,"LONG_STOP",high_price)
+        #trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+        #print(trade_time,last_price,"LONG_STOP",high_price)
         buy_long = 0
         squat_bar_long = 0
 
     if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi)  == "+" and buy_short == 1 and squat_bar_short > 0 and squat_bar_short <= 5:
-        trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        print(trade_time,last_price,"SHORT_STOP",low_price)
+        #trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+        #print(trade_time,last_price,"SHORT_STOP",low_price)
         buy_short = 0
         squat_bar_short = 0
 
