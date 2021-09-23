@@ -41,8 +41,14 @@ symbol = ""
 squat_bar_long = 0
 squat_bar_short = 0
 
-sma2 = [0,0]
-sma5 = [0,0]
+ema2 = []
+ema5 = []
+
+price_buy_long = 0
+price_sell = 0
+profit = 0
+all_profit = 0
+
 #{
 #  "e": "trade",     // Event type
 #  "E": 123456789,   // Event time
@@ -56,6 +62,14 @@ sma5 = [0,0]
 #  "m": true,        // Is the buyer the market maker?
 #  "M": true         // Ignore
 #}
+clist = requests.get("https://api.binance.com/api/v3/klines?symbol=XRPUSDT&interval=15m&limit=10").json()
+close = []
+for i in range(len(clist)):
+    close.append(float(clist[i][4]))
+ema2 = talib.EMA(np.array(close),2)
+ema5 = talib.EMA(np.array(close),5)
+
+
 
 def on_message(ws, message):
     #print(message)
@@ -89,8 +103,14 @@ def on_message(ws, message):
     global symbol
     global squat_bar_long
     global squat_bar_short
-    global sma2
-    global sma5
+    global ema2
+    global ema5
+    global close
+    global price_buy_long
+    global price_sell
+    global profit
+    global all_profit
+
 
     trade = json.loads(message)
     symbol = trade['s']
@@ -160,12 +180,10 @@ def on_message(ws, message):
 
         #print(kline_start_time,kline_close_time,open_price,close_price,high_price,low_price,base_asset_volume,is_this_kline_closed,tick_volume)
         if is_this_kline_closed:
-            clist = requests.get("https://api.binance.com/api/v3/klines?symbol=ADAUSDT&interval=5m&limit=5").json()
-            close = []
-            for i in range(len(clist)):
-                close.append(float(clist[i][4]))
-            sma2 = talib.SMA(np.array(close),2)
-            sma5 = talib.SMA(np.array(close),5)
+            close.append(close_price)
+            del close[1]
+            ema2 = talib.EMA(np.array(close),2)
+            ema5 = talib.EMA(np.array(close),5)
 
             squat_bar_long = squat_bar_long - 1
             squat_bar_short = squat_bar_short - 1
@@ -185,18 +203,22 @@ def on_message(ws, message):
             previous_tick_volume = current_tick_volume
             current_tick_volume = 1
             previous_mfi = current_mfi
-            buy_long = 1
-            buy_short = 1
 
-    if sma2[-1] > sma5[-1] and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
+    if ema2[-1] > ema5[-1] and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
         trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        print(trade_time,last_price,"LONG",high_price)
+        print(trade_time,last_price,"BUY_LONG",high_price,ema2,ema5)
+        price_buy_long = last_price
         buy_long = 0
         squat_bar_long = 0
 
-    if sma5[-1] > sma2[-1] and buy_long == 0:
+    if ema5[-1] > ema2[-1] and buy_long == 0:
         trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        print(trade_time,last_price,"LONG_STOP",low_price)
+        print(trade_time,last_price,"SELL",low_price,ema2,ema5)
+        price_sell = last_price
+        profit = price_sell - price_buy_long
+        all_profit = all_profit + profit
+        print("PROFIT:",profit,"ALL_PROFIT:",all_profit)
+        buy_long = 1
 
 def on_error(ws, error):
     print("### error ###")
@@ -214,7 +236,7 @@ def on_open(ws):
 
 #if __name__ == "__main__":
 def binance_socket():
-    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/adausdt@kline_5m/adausdt@trade",
+    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/xrpusdt@kline_15m/xrpusdt@trade",
                                 on_message = on_message,
                                 on_error = on_error,
                                 on_close = on_close)
