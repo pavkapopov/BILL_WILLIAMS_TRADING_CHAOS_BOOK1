@@ -62,7 +62,7 @@ all_profit = 0
 #  "m": true,        // Is the buyer the market maker?
 #  "M": true         // Ignore
 #}
-clist = requests.get("https://api.binance.com/api/v3/klines?symbol=XRPUSDT&interval=15m&limit=10").json()
+clist = requests.get("https://api.binance.com/api/v3/klines?symbol=XTZBTC&interval=5m&limit=10").json()
 close = []
 for i in range(len(clist)):
     close.append(float(clist[i][4]))
@@ -180,11 +180,6 @@ def on_message(ws, message):
 
         #print(kline_start_time,kline_close_time,open_price,close_price,high_price,low_price,base_asset_volume,is_this_kline_closed,tick_volume)
         if is_this_kline_closed:
-            close.append(close_price)
-            del close[1]
-            ema2 = talib.EMA(np.array(close),2)
-            ema5 = talib.EMA(np.array(close),5)
-
             squat_bar_long = squat_bar_long - 1
             squat_bar_short = squat_bar_short - 1
             if str(quick_dirty_trend) == "-" and int(open_in_interval) == 1 and int(close_in_interval) == 3 and str(tick_volume) == "+" and str(mfi) == "-":
@@ -203,6 +198,11 @@ def on_message(ws, message):
             previous_tick_volume = current_tick_volume
             current_tick_volume = 1
             previous_mfi = current_mfi
+
+    close.append(close_price)
+    del close[1]
+    ema2 = talib.EMA(np.array(close),2)
+    ema5 = talib.EMA(np.array(close),5)
 
     if ema2[-1] > ema5[-1] and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
         trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
@@ -236,7 +236,7 @@ def on_open(ws):
 
 #if __name__ == "__main__":
 def binance_socket():
-    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/xrpusdt@kline_15m/xrpusdt@trade",
+    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/xtzbtc@kline_5m/xtzbtc@trade",
                                 on_message = on_message,
                                 on_error = on_error,
                                 on_close = on_close)
