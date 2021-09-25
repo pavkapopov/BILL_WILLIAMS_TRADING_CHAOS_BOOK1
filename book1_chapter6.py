@@ -62,7 +62,7 @@ all_profit = 0
 #  "m": true,        // Is the buyer the market maker?
 #  "M": true         // Ignore
 #}
-clist = requests.get("https://api.binance.com/api/v3/klines?symbol=LTCUSDT&interval=5m&limit=10").json()
+clist = requests.get("https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=5m&limit=10").json()
 close = []
 for i in range(len(clist)):
     close.append(float(clist[i][4]))
@@ -214,13 +214,25 @@ def on_message(ws, message):
         squat_bar_long = 0
 
     if ema5[-1] > ema2[-1] and buy_long == 0:
-        trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-        print(trade_time,last_price,"SELL",low_price,ema2,ema5)
-        price_sell = last_price
-        profit = price_sell - price_buy_long
-        all_profit = all_profit + profit
-        print("PROFIT:",profit,"ALL_PROFIT:",all_profit)
-        buy_long = 1
+# если тренд не получился выставляем отложенный ордер на продажу по чуть завышенной цене.        
+        if last_price <= price_buy_long:
+            trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+            print(trade_time,last_price,"SELL",low_price,ema2,ema5)
+            price_sell = price_buy_long + price_buy_long*0.01
+            profit = price_sell - price_buy_long
+            all_profit = all_profit + profit
+            print("PROFIT:",profit,"ALL_PROFIT:",all_profit)
+            buy_long = 1
+
+#тренд удался выставляем ордер по текущей цене
+        if last_price > price_buy_long:
+            trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+            print(trade_time,last_price,"SELL",low_price,ema2,ema5)
+            price_sell = last_price
+            profit = price_sell - price_buy_long
+            all_profit = all_profit + profit
+            print("PROFIT:",profit,"ALL_PROFIT:",all_profit)
+            buy_long = 1
 
 def on_error(ws, error):
     print("### error ###")
@@ -238,7 +250,7 @@ def on_open(ws):
 
 #if __name__ == "__main__":
 def binance_socket():
-    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/ltcusdt@kline_5m/ltcusdt@trade",
+    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/solusdt@kline_5m/solusdt@trade",
                                 on_message = on_message,
                                 on_error = on_error,
                                 on_close = on_close)
