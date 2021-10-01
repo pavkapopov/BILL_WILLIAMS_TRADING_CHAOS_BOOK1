@@ -1,10 +1,13 @@
-import websocket
+"""Торговый бот по 1 книге 6 главе Билла Вильямса Торговый хаос"""
 import json
 import time
 import datetime
+from urllib.parse import urljoin, urlencode
+import hmac, hashlib
 import requests
 import talib
 import numpy as np
+import websocket
 
 #общие настройки
 API_KEY = ''
@@ -12,10 +15,6 @@ API_SECRET = ''
 BASE_URL = 'https://api.binance.com'
 PATH = '/api/v3/order'
 headers = {'X-MBX-APIKEY': API_KEY}
-
-#trade_symbol = "XRPUSDT" #торговая пара
-#trade_symbol_low = trade_symbol.lower() #торговая пара в нижнем регистре для передечи в websocket
-#spend_sum = 20  # Сколько тратить базовой валюты для покупки квотируемой.
 
 class BinanceException(Exception):
     def __init__(self, status_code, data):
@@ -33,8 +32,8 @@ class BinanceException(Exception):
         # super(BinanceException, self).__init__(message)
         super().__init__(message)
 
-#def adjust_to_step(value, step, increase=False):
-#   return ((int(value * 100000000) - int(value * 100000000) % int(float(step) * 100000000)) / 100000000)+(float(step) if increase else 0)
+def adjust_to_step(value, step, increase=True):
+   return ((int(value * 100000000) - int(value * 100000000) % int(float(step) * 100000000)) / 100000000)+(float(step) if increase else 0)
 
 tick_volume = "="
 current_tick_volume = 1
@@ -79,9 +78,10 @@ profit = 0
 all_profit = 0
 
 order_id = 0
-order_status =""
+order_status = ""
+client_orderid = ""
 
-clist = requests.get("https://api.binance.com/api/v3/klines?symbol=XRPUSDT&interval=5m&limit=10").json()
+clist = requests.get("https://api.binance.com/api/v3/klines?symbol=XRPUSDT&interval=1m&limit=10").json()
 close = []
 for i in range(len(clist)):
     close.append(float(clist[i][4]))
@@ -128,6 +128,8 @@ def on_message(ws, message):
     global profit
     global all_profit
     global order_id
+    global client_orderid
+
 
     trade = json.loads(message)
     symbol = trade['s']
@@ -208,7 +210,7 @@ def on_message(ws, message):
                 squat_bar_short = 5
             kline_start_time = datetime.datetime.utcfromtimestamp(kline_start_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
             kline_close_time = datetime.datetime.utcfromtimestamp(kline_close_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-            print(symbol,kline_start_time,kline_close_time,quick_dirty_trend,open_in_interval,close_in_interval,tick_volume,mfi,high_price,low_price,open_price,close_price,current_tick_volume,"EMA2:",ema2[-1],"EMA5:",ema5[-1])
+            print(symbol,kline_start_time,kline_close_time,quick_dirty_trend,open_in_interval,close_in_interval,tick_volume,mfi,high_price,low_price,open_price,close_price,current_tick_volume)
             previous_high_price = high_price
             previous_low_price = low_price
             previous_tick_volume = current_tick_volume
@@ -216,70 +218,73 @@ def on_message(ws, message):
             previous_mfi = current_mfi
 
     if ema2[-1] > ema5[-1] and buy_long == 1 and squat_bar_long > 0 and squat_bar_long <= 5:
+        print("Выполнилось условие на покупку!")
         timestamp = requests.get("https://api.binance.com/api/v3/time").json()
-        params = {'symbol': 'XRPUSDT','side': 'BUY','type': 'MARKET','quantity': 5,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
+        params = {'symbol': 'XRPUSDT','side': 'BUY','type': 'MARKET','quantity': 14,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
         query_string = urlencode(params)
         params['signature'] = hmac.new(API_SECRET.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
         url = urljoin(BASE_URL, PATH)
         r = requests.post(url, headers=headers, params=params)
         if r.status_code == 200:
-            data = r.json()
-            price_buy_long = data["price"]
-            order_id = data["orderId"]
-            trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
-            print(trade_time,price_buy_long,"BUY_LONG")
             buy_long = 0
             squat_bar_long = 0
+            data = r.json()
+            price_buy_long = float(data["fills"][0]["price"])
+            order_id = data["orderId"]
+            client_orderid = data["clientOrderId"]
+            trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
+            print(trade_time,price_buy_long,"BUY_LONG")
         else:
             raise BinanceException(status_code=r.status_code, data=r.json())
 
-
     if ema5[-1] > ema2[-1] and buy_long == 0:
-
+        print("Выполнилось условие на продажу!")
 #получаем данные по ордеру
         timestamp = requests.get("https://api.binance.com/api/v3/time").json()
-        params = {'symbol': 'XRPUSDT','orderid': order_id,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
+        params = {'symbol': 'XRPUSDT','orderId': order_id, 'origClientOrderId': client_orderid,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
         query_string = urlencode(params)
         params['signature'] = hmac.new(API_SECRET.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
         url = urljoin(BASE_URL, PATH)
         r = requests.get(url, headers=headers, params=params)
         if r.status_code == 200:
             data = r.json()
-            order_id = data["orderId"]
-            price_buy_long = data["price"]
             order_status = data["status"]
-            print("ORDER:", order_id, "STATUS:", order_status, "PRICE:", price_buy_long)
+            print("Статус ордера на покупку:","ORDER:", order_id, "STATUS:", order_status)
         else:
             raise BinanceException(status_code=r.status_code, data=r.json())
 
         if order_status == "FILLED":
+            print("Ордер выполнен можно продавать!")
 
 # если тренд не получился выставляем отложенный ордер на продажу по чуть завышенной цене.        
-            if last_price <= price_buy_long:
+            if last_price <= price_buy_long * (0.001*2) and buy_long == 0:
+                limit_sell_price =  price_buy_long + price_buy_long * (0.001*2) + price_buy_long * 0.005
                 timestamp = requests.get("https://api.binance.com/api/v3/time").json()
-                params = {'symbol': 'XRPUSDT','side': 'SELL','type': 'LIMIT','timeInForce': 'GTC','quantity': 5, 'price': price_buy_long * 0.05,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
+                params = {'symbol': 'XRPUSDT','side': 'SELL','type': 'LIMIT','timeInForce': 'GTC','quantity': 13, 'price': adjust_to_step(limit_sell_price,0.00010000),'recvWindow': 5000,'timestamp': timestamp['serverTime']}
                 query_string = urlencode(params)
                 params['signature'] = hmac.new(API_SECRET.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
                 url = urljoin(BASE_URL, PATH)
                 r = requests.post(url, headers=headers, params=params)
                 if r.status_code == 200:
                     buy_long = 1
+                    data = r.json()
+                    print("Лимитный ордер выставлен успешно:","ORDER:", data["orderId"], "STATUS:", data["status"], "PRICE:", data["price"])
                 else:
                     raise BinanceException(status_code=r.status_code, data=r.json())
 
 #тренд удался выставляем ордер по текущей цене
-            if last_price > price_buy_long:
+            if last_price > price_buy_long * (0.001*2) and buy_long == 0:
                 trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
                 timestamp = requests.get("https://api.binance.com/api/v3/time").json()
-                params = {'symbol': 'XRPUSDT','side': 'SELL','type': 'MARKET','quantity': 5,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
+                params = {'symbol': 'XRPUSDT','side': 'SELL','type': 'MARKET','quantity': 13,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
                 query_string = urlencode(params)
                 params['signature'] = hmac.new(API_SECRET.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
                 url = urljoin(BASE_URL, PATH)
                 r = requests.post(url, headers=headers, params=params)
                 if r.status_code == 200:
-                    data = r.json()
-                    print(trade_time,data["price"],"SELL")
                     buy_long = 1
+                    data = r.json()
+                    print("Маркет ордер выставлен успешно:",trade_time,"PRICE:", data["price"])
                 else:
                     raise BinanceException(status_code=r.status_code, data=r.json())
 
@@ -299,7 +304,7 @@ def on_open(ws):
 
 #if __name__ == "__main__":
 def binance_socket():
-    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/xrpusdt@kline_5m/xrpusdt@trade",
+    ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/xrpusdt@kline_1m/xrpusdt@trade",
                                 on_message = on_message,
                                 on_error = on_error,
                                 on_close = on_close)
