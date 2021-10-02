@@ -16,10 +16,6 @@ BASE_URL = 'https://api.binance.com'
 PATH = '/api/v3/order'
 headers = {'X-MBX-APIKEY': API_KEY}
 
-trade_symbol = "XRPUSDT" #торговая пара
-trade_symbol_low = trade_symbol.lower() #торговая пара в нижнем регистре для передечи в websocket
-spend_sum = 20  # Сколько тратить базовой валюты для покупки квотируемой.
-
 class BinanceException(Exception):
     def __init__(self, status_code, data):
 
