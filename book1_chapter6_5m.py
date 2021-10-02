@@ -259,10 +259,9 @@ def on_message(ws, message):
 
         if order_status == "FILLED":
             print("Ордер выполнен можно продавать!")
-
+            limit_sell_price =  price_buy_long + price_buy_long * (0.001*2) + price_buy_long * 0.005
 # если тренд не получился выставляем отложенный ордер на продажу по чуть завышенной цене.        
-            if last_price <= price_buy_long * (0.001*2) and buy_long == 0:
-                limit_sell_price =  price_buy_long + price_buy_long * (0.001*2) + price_buy_long * 0.005
+            if last_price <= limit_sell_price and buy_long == 0:
                 timestamp = requests.get("https://api.binance.com/api/v3/time").json()
                 params = {'symbol': 'XRPUSDT','side': 'SELL','type': 'LIMIT','timeInForce': 'GTC','quantity': 14, 'price': adjust_to_step(limit_sell_price,0.00010000),'recvWindow': 5000,'timestamp': timestamp['serverTime']}
                 query_string = urlencode(params)
@@ -277,7 +276,7 @@ def on_message(ws, message):
                     raise BinanceException(status_code=r.status_code, data=r.json())
 
 #тренд удался выставляем ордер по текущей цене
-            if last_price > price_buy_long * (0.001*2) and buy_long == 0:
+            if last_price > limit_sell_price and buy_long == 0:
                 trade_time = datetime.datetime.utcfromtimestamp(trade_time_tick/1000).replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%d.%m.%Y %H:%M:%S')
                 timestamp = requests.get("https://api.binance.com/api/v3/time").json()
                 params = {'symbol': 'XRPUSDT','side': 'SELL','type': 'MARKET','quantity': 14,'recvWindow': 5000,'timestamp': timestamp['serverTime']}
